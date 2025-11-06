@@ -1,0 +1,41 @@
+[package]
+name = "midnight-wasm-prover"
+version = "0.1.0"
+authors = ["Enzo Cioppettini <48031343+ecioppettini@users.noreply.github.com>"]
+edition = "2024"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = "0.2.84"
+wasm-bindgen-futures = "0.4.45"
+wasm-bindgen-rayon = "1.2"
+
+rayon = "1.10.0"
+futures = "0.3.31"
+
+midnight-ledger = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-ledger", tag = "ledger-6.1.0-alpha.4" } # From feature/unshielded-ledger
+midnight-base-crypto = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-base-crypto", tag = "ledger-6.1.0-alpha.4" }
+midnight-onchain-runtime = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-onchain-runtime", tag = "ledger-6.1.0-alpha.4" }
+midnight-onchain-state = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-onchain-state", tag = "ledger-6.1.0-alpha.4" }
+coin-structure = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-coin-structure", tag = "ledger-6.1.0-alpha.4" }
+midnight-transient-crypto = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-transient-crypto", tag = "ledger-6.1.0-alpha.4" }
+zkir = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "zkir", tag = "ledger-6.1.0-alpha.4" }
+midnight-serialize = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-serialize", tag = "ledger-6.1.0-alpha.4" }
+ledger-storage = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-storage", tag = "ledger-6.1.0-alpha.4", default-features = false }
+rand = { version = "^0.8.4", features = ["getrandom"] }
+
+console_error_panic_hook = { version = "0.1.7", optional = true }
+url = "2.5.4"
+reqwest = "0.12.15"
+sha2 = "0.10.9"
+const-hex = "1.17.0"
+
+[target.wasm32-unknown-unknown.dependencies]
+getrandom_v2 = { version = "0.2", features = ["js"], package = "getrandom" }
+getrandom    = { version = "0.3", features = ["wasm_js"] }
