@@ -1,6 +1,6 @@
 [package]
 name = "midnight-wasm-prover"
-version = "0.1.0"
+version = "0.1.0-alpha1"
 authors = ["Enzo Cioppettini <48031343+ecioppettini@users.noreply.github.com>"]
 edition = "2024"
 license = "Apache-2.0"
