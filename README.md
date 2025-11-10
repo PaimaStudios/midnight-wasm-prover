@@ -6,6 +6,17 @@ This package contains slightly opinionated bindings for proving
 The `webpack-demo` directory can be used as a template. It produces the proof
 for a random zswap transaction.
 
+# Building
+
+- Get [rustup](https://rustup.rs/)
+- Ensure the nightly toolchain is installed: `rustup toolchain install
+nightly-2025-10-01`.
+- Get [wasm-pack](https://drager.github.io/wasm-pack/installer/) if needed.
+- Get [just](https://github.com/casey/just) and run `just build`. Or manually
+run the commands in `justfile`.
+
+*NOTE: * For more details about the flags see the [wasm-bindgen-rayon documentation](https://github.com/RReverser/wasm-bindgen-rayon?tab=readme-ov-file#building-rust-code).
+
 ## Usage
 
 >  **NOTE:** For the thread pool to work, it's necessary to set the
