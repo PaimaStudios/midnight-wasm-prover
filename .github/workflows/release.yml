@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - run: apt update
-    - run: apt install clang -y
+    - run: sudo apt update
+    - run: sudo apt install clang -y
 
     - name: Checkout code
       uses: actions/checkout@v4
