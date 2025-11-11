@@ -17,6 +17,26 @@ run the commands in `justfile`.
 
 *NOTE: * For more details about the flags see the [wasm-bindgen-rayon documentation](https://github.com/RReverser/wasm-bindgen-rayon?tab=readme-ov-file#building-rust-code).
 
+## Demo
+
+For the demo in `webpack-demo`:
+
+Either build the wasm package with the steps above, or get it from the [releases](https://github.com/PaimaStudios/midnight-wasm-prover/releases):
+
+```sh
+wget https://github.com/PaimaStudios/midnight-wasm-prover/releases/download/v0.1.0-alpha1/paima-midnight-wasm-prover-0.1.0-alpha1.tgz
+tar -xzf paima-midnight-wasm-prover-0.1.0-alpha1.tgz
+mv package pkg
+```
+
+Then
+
+```sh
+cd webpack-demo
+npm install
+npm run serve
+```
+
 ## Usage
 
 >  **NOTE:** For the thread pool to work, it's necessary to set the
