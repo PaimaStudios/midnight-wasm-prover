@@ -17,6 +17,7 @@ use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use utils::{EXPECTED_DATA, set_panic_hook};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 pub use wasm_bindgen_rayon::init_thread_pool;
 
@@ -89,15 +90,30 @@ impl CostModel {
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct MidnightWasmParamsProvider {
-    base_url: String,
+    base_url: Option<String>,
+    fetcher: Option<js_sys::Function>,
+    client: reqwest::Client,
     cache: Arc<Mutex<HashMap<u8, midnight_transient_crypto::proofs::ParamsProver>>>,
 }
 
 #[wasm_bindgen]
 impl MidnightWasmParamsProvider {
     pub fn new(base_url: String) -> Self {
+        Self::with_source(Some(base_url), None)
+    }
+
+    #[wasm_bindgen(js_name = "newWithFetcher")]
+    pub fn new_with_fetcher(fetcher: js_sys::Function) -> Self {
+        Self::with_source(None, Some(fetcher))
+    }
+}
+
+impl MidnightWasmParamsProvider {
+    fn with_source(base_url: Option<String>, fetcher: Option<js_sys::Function>) -> Self {
         Self {
             base_url,
+            fetcher,
+            client: reqwest::Client::new(),
             cache: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -113,37 +129,12 @@ impl midnight_transient_crypto::proofs::ParamsProverProvider for MidnightWasmPar
         }
 
         let data = EXPECTED_DATA[k as usize - 10];
-
-        let mut url = self.base_url.clone();
-        url.push('/');
-        url.push_str(data.0);
-
-        let raw = reqwest::Client::new()
-            .get(url.clone())
-            .send()
-            .await
-            .map_err(|_e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    format!("Failed to fetch data from {url}"),
-                )
-            })?
-            .bytes()
-            .await
-            .map_err(|_e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Expected response to be bytes".to_string(),
-                )
-            })?;
+        let raw = self.fetch_params_bytes(k, data.0).await?;
 
         if raw.is_empty() {
             return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!(
-                    "Prover params not found or empty. Expected file {} at {}",
-                    data.0, url
-                ),
+                std::io::ErrorKind::UnexpectedEof,
+                format!("Prover params not found or empty. Expected file {}", data.0),
             ));
         }
 
@@ -156,9 +147,7 @@ impl midnight_transient_crypto::proofs::ParamsProverProvider for MidnightWasmPar
         if hash != data.1 {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!(
-                    "Hash mismatch for k: {k}. This means the file may be outdated or corrupted. This may be fixing by clearing the cache."
-                ),
+                format!("Hash mismatch for k: {k}. The params file may be outdated or corrupted."),
             ))
         } else {
             let params = midnight_transient_crypto::proofs::ParamsProver::read(Cursor::new(raw))
@@ -174,10 +163,141 @@ impl midnight_transient_crypto::proofs::ParamsProverProvider for MidnightWasmPar
     }
 }
 
+impl MidnightWasmParamsProvider {
+    async fn fetch_params_bytes(&self, k: u8, expected_file: &str) -> std::io::Result<Vec<u8>> {
+        if let Some(fetcher) = &self.fetcher {
+            let result = fetcher
+                .call1(&JsValue::NULL, &JsValue::from(k))
+                .map_err(|err| {
+                    js_error_to_io(
+                        err,
+                        std::io::ErrorKind::Other,
+                        "Params fetcher threw before returning",
+                    )
+                })?;
+
+            let promise = js_sys::Promise::resolve(&result);
+            let value = JsFuture::from(promise).await.map_err(|err| {
+                js_error_to_io(
+                    err,
+                    std::io::ErrorKind::Other,
+                    "Params fetcher promise rejected",
+                )
+            })?;
+
+            return js_value_to_bytes(
+                value,
+                std::io::ErrorKind::InvalidData,
+                "Params fetcher must return a Uint8Array or ArrayBuffer",
+            );
+        }
+
+        let base_url = self.base_url.as_ref().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "No base URL or custom params fetcher configured",
+            )
+        })?;
+
+        let url = join_url(base_url, expected_file)?;
+
+        self.client
+            .get(url.clone())
+            .send()
+            .await
+            .map_err(|_e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to fetch data from {url}"),
+                )
+            })?
+            .bytes()
+            .await
+            .map_err(|_e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Expected response to be bytes".to_string(),
+                )
+            })
+            .map(|bytes| bytes.to_vec())
+    }
+}
+
+fn js_error_to_io(err: JsValue, kind: std::io::ErrorKind, context: &str) -> std::io::Error {
+    let message = err
+        .as_string()
+        .or_else(|| {
+            js_sys::JSON::stringify(&err)
+                .ok()
+                .and_then(|s| s.as_string())
+        })
+        .unwrap_or_else(|| "unknown JS error".to_string());
+
+    std::io::Error::new(kind, format!("{context}: {message}"))
+}
+
+fn js_value_to_bytes(
+    value: JsValue,
+    kind: std::io::ErrorKind,
+    context: &str,
+) -> std::io::Result<Vec<u8>> {
+    match value.dyn_into::<js_sys::Uint8Array>() {
+        Ok(bytes) => Ok(bytes.to_vec()),
+        Err(value) => match value.dyn_into::<js_sys::ArrayBuffer>() {
+            Ok(buffer) => Ok(Uint8Array::new(&buffer).to_vec()),
+            Err(_) => Err(std::io::Error::new(kind, context.to_string())),
+        },
+    }
+}
+
+fn join_url(base_url: &str, path: &str) -> std::io::Result<String> {
+    let base = url::Url::parse(base_url).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Invalid base URL {base_url}: {e}"),
+        )
+    })?;
+
+    base.join(path).map(|url| url.to_string()).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Failed to join URL path {path}: {e}"),
+        )
+    })
+}
+
+#[derive(Clone, Copy)]
+enum ResolverArtifactType {
+    ProverKey,
+    VerifierKey,
+    IrSource,
+}
+
+impl ResolverArtifactType {
+    fn path_component(self) -> &'static str {
+        match self {
+            Self::ProverKey => "pk",
+            Self::VerifierKey => "vk",
+            Self::IrSource => "ir",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::ProverKey => "prover key",
+            Self::VerifierKey => "verifier key",
+            Self::IrSource => "IR source",
+        }
+    }
+}
+
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct WasmResolver {
-    base_url: String,
+    base_url: Option<String>,
+    prover_key_fetcher: Option<js_sys::Function>,
+    verifier_key_fetcher: Option<js_sys::Function>,
+    ir_source_fetcher: Option<js_sys::Function>,
     client: reqwest::Client,
     cache: Arc<Mutex<HashMap<String, ProvingKeyMaterial>>>,
 }
@@ -185,8 +305,36 @@ pub struct WasmResolver {
 #[wasm_bindgen]
 impl WasmResolver {
     pub fn new(base_url: String) -> Self {
+        Self::with_sources(Some(base_url), None, None, None)
+    }
+
+    #[wasm_bindgen(js_name = "newWithFetchers")]
+    pub fn new_with_fetchers(
+        prover_key_fetcher: js_sys::Function,
+        verifier_key_fetcher: js_sys::Function,
+        ir_source_fetcher: js_sys::Function,
+    ) -> Self {
+        Self::with_sources(
+            None,
+            Some(prover_key_fetcher),
+            Some(verifier_key_fetcher),
+            Some(ir_source_fetcher),
+        )
+    }
+}
+
+impl WasmResolver {
+    fn with_sources(
+        base_url: Option<String>,
+        prover_key_fetcher: Option<js_sys::Function>,
+        verifier_key_fetcher: Option<js_sys::Function>,
+        ir_source_fetcher: Option<js_sys::Function>,
+    ) -> Self {
         Self {
             base_url,
+            prover_key_fetcher,
+            verifier_key_fetcher,
+            ir_source_fetcher,
             client: reqwest::Client::new(),
             cache: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -205,42 +353,15 @@ impl midnight_transient_crypto::proofs::Resolver for WasmResolver {
             return Ok(Some(cached));
         }
 
-        let fetch_key_data = |suffix: String, key_type: String| async move {
-            let url = format!("{}/{}/{}", self.base_url, key_path, suffix);
-
-            let raw = self
-                .client
-                .get(&url)
-                .send()
-                .await
-                .map_err(|_e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        format!("Failed to fetch {key_type} from {url}"),
-                    )
-                })?
-                .bytes()
-                .await
-                .map_err(|_e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        format!("Expected {key_type} response to be bytes"),
-                    )
-                })?;
-
-            if raw.is_empty() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    format!("{key_type} not found or empty at {url}"),
-                ));
-            }
-
-            Ok(raw.to_vec())
-        };
-
-        let pk_raw = fetch_key_data("pk".to_string(), "prover key".to_string()).await?;
-        let vk_raw = fetch_key_data("vk".to_string(), "verifier key".to_string()).await?;
-        let ir_raw = fetch_key_data("ir".to_string(), "IR source".to_string()).await?;
+        let pk_raw = self
+            .fetch_key_data(key_path, ResolverArtifactType::ProverKey)
+            .await?;
+        let vk_raw = self
+            .fetch_key_data(key_path, ResolverArtifactType::VerifierKey)
+            .await?;
+        let ir_raw = self
+            .fetch_key_data(key_path, ResolverArtifactType::IrSource)
+            .await?;
 
         let proving_key_material = ProvingKeyMaterial {
             prover_key: pk_raw,
@@ -253,6 +374,100 @@ impl midnight_transient_crypto::proofs::Resolver for WasmResolver {
             .insert(key_path.to_string(), proving_key_material.clone());
 
         Ok(Some(proving_key_material))
+    }
+}
+
+impl WasmResolver {
+    async fn fetch_key_data(
+        &self,
+        key_path: &str,
+        artifact_type: ResolverArtifactType,
+    ) -> std::io::Result<Vec<u8>> {
+        let fetcher = match artifact_type {
+            ResolverArtifactType::ProverKey => self.prover_key_fetcher.as_ref(),
+            ResolverArtifactType::VerifierKey => self.verifier_key_fetcher.as_ref(),
+            ResolverArtifactType::IrSource => self.ir_source_fetcher.as_ref(),
+        };
+
+        if let Some(fetcher) = fetcher {
+            let result = fetcher
+                .call1(&JsValue::NULL, &JsValue::from(key_path))
+                .map_err(|err| {
+                    js_error_to_io(
+                        err,
+                        std::io::ErrorKind::Other,
+                        "Resolver fetcher threw before returning",
+                    )
+                })?;
+
+            let promise = js_sys::Promise::resolve(&result);
+            let value = JsFuture::from(promise).await.map_err(|err| {
+                js_error_to_io(
+                    err,
+                    std::io::ErrorKind::Other,
+                    "Resolver fetcher promise rejected",
+                )
+            })?;
+
+            let raw = js_value_to_bytes(
+                value,
+                std::io::ErrorKind::InvalidData,
+                "Resolver fetcher must return a Uint8Array or ArrayBuffer",
+            )?;
+            if raw.is_empty() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    format!(
+                        "{} not found or empty for {key_path}/{}",
+                        artifact_type.label(),
+                        artifact_type.path_component()
+                    ),
+                ));
+            }
+
+            return Ok(raw);
+        }
+
+        let base_url = self.base_url.as_ref().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "No base URL or custom resolver fetchers configured",
+            )
+        })?;
+
+        let url = join_url(
+            base_url,
+            &format!("{key_path}/{}", artifact_type.path_component()),
+        )?;
+
+        let raw = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|_e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to fetch {} from {url}", artifact_type.label()),
+                )
+            })?
+            .bytes()
+            .await
+            .map_err(|_e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Expected {} response to be bytes", artifact_type.label()),
+                )
+            })?;
+
+        if raw.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!("{} not found or empty at {url}", artifact_type.label()),
+            ));
+        }
+
+        Ok(raw.to_vec())
     }
 }
 
