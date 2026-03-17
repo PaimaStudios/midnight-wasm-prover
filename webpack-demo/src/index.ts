@@ -21,7 +21,6 @@ async function printElapsedTime(
     const seconds = Math.floor(elapsedMs / 1000);
     const minutes = Math.floor(seconds / 60);
     const timeText = `Elapsed time: ${minutes}m ${seconds % 60}s`;
-    console.log(timeText);
 
     if (timeLabel) {
       timeLabel.textContent = timeText;
@@ -33,7 +32,6 @@ async function printElapsedTime(
 
 async function initializeWorker() {
   const baseUrl = new URL(window.location.href).toString();
-  console.log(`baseUrl: ${baseUrl}`);
 
   let readyResolve: (value: void) => void;
   let paramsResolve: (value: void) => void;
@@ -55,8 +53,8 @@ async function initializeWorker() {
       case "params-ready":
         paramsResolve();
         break;
-      case "log":
-        console.log(message);
+      case "error":
+        console.error(message);
         break;
     }
   };
@@ -69,8 +67,6 @@ async function initializeWorker() {
   } as ProverMessage);
 
   await paramsReady;
-
-  console.log("Worker initialized and ready for proving");
 }
 
 async function runProof() {
@@ -95,9 +91,6 @@ async function runProof() {
       const { type, data, message } = event.data;
 
       switch (type) {
-        case "log":
-          console.log(message);
-          break;
         case "success":
           abortController.abort();
           button.disabled = false;
@@ -127,9 +120,18 @@ async function runProof() {
       statusLabel.style.color = 'red';
       reject(error);
     };
+
+    worker.onmessageerror = () => {
+      abortController.abort();
+      button.disabled = false;
+      button.textContent = 'Start Proof';
+      statusLabel.textContent = 'Worker message error';
+      statusLabel.style.color = 'red';
+      reject(new Error('Worker message error'));
+    };
   });
 
-  let unproven = testVectors.unprovenTransactionGuaranteedAndFallible();
+  let unproven = testVectors.unprovenTransactionGuaranteed();
 
   worker.postMessage({
     type: "prove",
@@ -140,10 +142,34 @@ async function runProof() {
   await result;
 }
 
+function downloadBytes(filename: string, bytes: Uint8Array) {
+  const copied = new Uint8Array(bytes);
+  const blob = new Blob([copied.buffer], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function dumpUnprovenTx() {
+  const unproven = testVectors.unprovenTransactionGuaranteed();
+  const serialized = unproven.serialize();
+  downloadBytes('unproven-transaction.bin', serialized);
+}
+
 async function run() {
   const container = document.createElement('div');
   container.style.padding = '20px';
   container.style.fontFamily = 'Arial, sans-serif';
+
+  const actions = document.createElement('div');
+  actions.style.display = 'flex';
+  actions.style.gap = '12px';
+  actions.style.alignItems = 'center';
+  actions.style.margin = '10px 0';
+  actions.style.flexWrap = 'wrap';
 
   const button = document.createElement('button');
   button.id = 'proveButton';
@@ -151,8 +177,13 @@ async function run() {
   button.disabled = true;
   button.style.padding = '10px 20px';
   button.style.fontSize = '16px';
-  button.style.margin = '10px 0';
-  button.style.display = 'block';
+
+  const dumpButton = document.createElement('button');
+  dumpButton.id = 'dumpButton';
+  dumpButton.textContent = 'Dump Unproven Tx';
+  dumpButton.style.padding = '10px 20px';
+  dumpButton.style.fontSize = '16px';
+  dumpButton.onclick = dumpUnprovenTx;
 
   const timeLabel = document.createElement('div');
   timeLabel.id = 'timeLabel';
@@ -183,7 +214,9 @@ async function run() {
   resultLabel.style.maxHeight = '200px';
   resultLabel.style.overflowY = 'auto';
 
-  container.appendChild(button);
+  actions.appendChild(button);
+  actions.appendChild(dumpButton);
+  container.appendChild(actions);
   container.appendChild(timeLabel);
   container.appendChild(statusLabel);
   container.appendChild(resultLabel);

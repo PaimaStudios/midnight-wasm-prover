@@ -1,4 +1,4 @@
-import { createShieldedCoinInfo, sampleCoinPublicKey, sampleEncryptionPublicKey, ShieldedTokenType, Transaction, ZswapOffer, ZswapOutput } from "@midnight-ntwrk/ledger-v6";
+import { createShieldedCoinInfo, sampleCoinPublicKey, sampleEncryptionPublicKey, ShieldedTokenType, Transaction, ZswapOffer, ZswapOutput } from "@midnight-ntwrk/ledger-v8";
 
 export const generateHex = (len: number) =>
   [...Array(len)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');

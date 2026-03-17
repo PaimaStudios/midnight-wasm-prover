@@ -8,29 +8,41 @@ import init, {
 } from "@paima/midnight-wasm-prover";
 import type { ProverMessage, ProverResponse } from "./worker-types.js";
 
-// @ts-ignore
-await init();
+self.addEventListener("error", (event) => {
+  self.postMessage({
+    type: "error",
+    message: event.message || "Unhandled worker error",
+  } as ProverResponse);
+});
 
-await initThreadPool(navigator.hardwareConcurrency);
+self.addEventListener("unhandledrejection", (event) => {
+  const reason =
+    event.reason instanceof Error ? event.reason.message : String(event.reason);
+  self.postMessage({
+    type: "error",
+    message: `Unhandled worker rejection: ${reason}`,
+  } as ProverResponse);
+});
 
-self.postMessage({
-  type: "wasm-ready",
-  message: "worker pool initialized initialized",
-} as ProverResponse);
+self.addEventListener("messageerror", () => {
+  self.postMessage({
+    type: "error",
+    message: "Worker message deserialization failed",
+  } as ProverResponse);
+});
 
 let prover: WasmProver | undefined;
-let rng = Rng.new();
+let rng: Rng | undefined;
 
 async function runProver(serializedTx: Uint8Array) {
   try {
+    if (!prover || !rng) {
+      throw new Error("Prover worker is not initialized");
+    }
     const startTime = performance.now();
-    console.time("prove");
-    const result = await prover!.prove(rng, serializedTx, CostModel.initialCostModel());
-    console.timeEnd("prove");
+    const result = await prover.prove(rng, serializedTx, CostModel.initialCostModel());
     const endTime = performance.now();
     const durationMs = Math.round(endTime - startTime);
-
-    console.log(`proven raw tx: ${uint8ArrayToHex(result)}`);
 
     self.postMessage({
       type: "success",
@@ -38,7 +50,6 @@ async function runProver(serializedTx: Uint8Array) {
       durationMs: durationMs,
     } as ProverResponse);
   } catch (error) {
-    console.log("error on prove function u.u");
     self.postMessage({
       type: "error",
       message: error instanceof Error ? error.message : String(error),
@@ -46,19 +57,33 @@ async function runProver(serializedTx: Uint8Array) {
   }
 }
 
-function uint8ArrayToHex(uint8Array: Uint8Array) {
-  return Array.from(uint8Array, function(byte) {
-    return ("0" + (byte & 0xff).toString(16)).slice(-2);
-  }).join("");
+async function initializeWasm() {
+  try {
+    // @ts-ignore
+    await init();
+    rng = Rng.new();
+    const threadCount = navigator.hardwareConcurrency;
+    await initThreadPool(threadCount);
+
+    self.postMessage({
+      type: "wasm-ready",
+      message: "worker pool initialized",
+    } as ProverResponse);
+  } catch (error) {
+    self.postMessage({
+      type: "error",
+      message: error instanceof Error ? error.message : String(error),
+    } as ProverResponse);
+  }
 }
 
+void initializeWasm();
+
 self.onmessage = async (event: MessageEvent<ProverMessage>) => {
-  console.log("onmessage received:", event.data);
   const { type } = event.data;
 
   if (type === "params") {
     const { baseUrl } = event.data;
-    console.log("initializing params with baseUrl:", baseUrl);
 
     const resolver = WasmResolver.new(baseUrl);
     const pp = MidnightWasmParamsProvider.new(baseUrl);
