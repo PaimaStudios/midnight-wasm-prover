@@ -1,5 +1,5 @@
 build:
-    rustup run nightly-2025-10-01 \
+    rustup run nightly-2025-11-15 \
       wasm-pack build --release --target web . -d pkg \
       -- -Z build-std=panic_abort,std
 

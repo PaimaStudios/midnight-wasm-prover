@@ -11,43 +11,43 @@ pub(crate) fn set_panic_hook() {
 
 pub(crate) const EXPECTED_DATA: &[(&str, [u8; 32], &str)] = &[
     (
-        "bls_filecoin_2p10",
-        hexhash(b"d1a3403c1f8669e82ed28d9391e13011aea76801b28fe14b42bf76d141b4efa2"),
+        "bls_midnight_2p10",
+        hexhash(b"46b2290933cbed4c378889e4ba971f1a92888331ffb09466acd4ff61a1e2cb42"),
         "public parameters for k=10",
     ),
     (
-        "bls_filecoin_2p11",
-        hexhash(b"b5047f05800dbd84fd1ea43b96a8850e128b7a595ed132cd72588cc2cb146b29"),
+        "bls_midnight_2p11",
+        hexhash(b"9901589d7956ff58be0d85569b2f455b77b58c3758026ffb5bbe4807000b96d1"),
         "public parameters for k=11",
     ),
     (
-        "bls_filecoin_2p12",
-        hexhash(b"b32791775af5fff1ae5ead682c3d8832917ebb0652b43cf810a1e3956eb27a71"),
+        "bls_midnight_2p12",
+        hexhash(b"ef08eb3fcf62df8f72c515cffa027e681808b530cb016eea104115545ef6d5c8"),
         "public parameters for k=12",
     ),
     (
-        "bls_filecoin_2p13",
-        hexhash(b"b9af43892c3cb90321fa00a36e5e59051f356df145d7f58368531f28d212937b"),
+        "bls_midnight_2p13",
+        hexhash(b"d3324910969c4cc54143b8045b649e5c3a4bd5fb7b8f85fe1b770f640ce1c803"),
         "public parameters for k=13",
     ),
     (
-        "bls_filecoin_2p14",
-        hexhash(b"4923e5a7fbb715d81cdb5c03b9c0e211768d35ccc52d82f49c3d93bcf8d36a56"),
+        "bls_midnight_2p14",
+        hexhash(b"fc253016885ec830e97808c9ec920bb5cab5c21af590380a6cb5eb0538e2b244"),
         "public parameters for k=14",
     ),
     (
-        "bls_filecoin_2p15",
-        hexhash(b"162fac0cf70b9b02e02195ec37013c04997b39dc1831a97d5a83f47a9ce39c97"),
+        "bls_midnight_2p15",
+        hexhash(b"724c7c3d779148bb113c7ee9c034b2f27db16e6bdf315fde90105a9bad00b1de"),
         "public parameters for k=15",
     ),
     (
-        "bls_filecoin_2p16",
-        hexhash(b"4ebc0d077fe6645e9b7ca6563217be2176f00dfe39cc97b3f60ecbad3573f973"),
+        "bls_midnight_2p16",
+        hexhash(b"09c877216d6589b370263e18af40a030a901b41a7a7c37ef58c9901db41f05c6"),
         "public parameters for k=16",
     ),
     (
-        "bls_filecoin_2p17",
-        hexhash(b"7228c4519e96ece2c54bf2f537d9f26b0ed042819733726623fab5e17eac4360"),
+        "bls_midnight_2p17",
+        hexhash(b"4a9ef6c7c0619aab74eede44b13e753e3ba54508a02dd3b7106a949aabb73b74"),
         "public parameters for k=17",
     ),
     (
