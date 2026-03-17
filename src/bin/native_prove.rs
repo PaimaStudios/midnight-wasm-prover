@@ -74,10 +74,9 @@ fn verify_params_hash(params_root: &Path) -> Result<()> {
 
 fn main() -> Result<()> {
     let mut args = env::args().skip(1);
-    let tx_path = args
-        .next()
-        .map(PathBuf::from)
-        .ok_or_else(|| anyhow!("usage: cargo run --bin native_prove -- <tx.bin> [params_root] [artifacts_root]"))?;
+    let tx_path = args.next().map(PathBuf::from).ok_or_else(|| {
+        anyhow!("usage: cargo run --bin native_prove -- <tx.bin> [params_root] [artifacts_root]")
+    })?;
     let params_root = args
         .next()
         .map(PathBuf::from)
@@ -117,7 +116,8 @@ fn main() -> Result<()> {
     let prove_elapsed = prove_started_at.elapsed();
 
     let mut proven_bytes = Vec::new();
-    tagged_serialize(&proven, &mut proven_bytes).context("failed to serialize proven transaction")?;
+    tagged_serialize(&proven, &mut proven_bytes)
+        .context("failed to serialize proven transaction")?;
 
     println!("input_bytes={}", tx_bytes.len());
     println!("output_bytes={}", proven_bytes.len());
