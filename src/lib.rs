@@ -1,3 +1,5 @@
+#![cfg(target_arch = "wasm32")]
+
 use ledger_storage::db::InMemoryDB;
 use midnight_base_crypto::signatures::Signature;
 use midnight_ledger::structure::{ProofPreimageMarker, Transaction};
@@ -10,19 +12,15 @@ use midnight_transient_crypto::{
 use rand::SeedableRng as _;
 use rand::rngs::StdRng;
 use sha2::Digest as _;
+use std::collections::HashMap;
 use std::io::Cursor;
+use std::sync::{Arc, Mutex};
 use utils::{EXPECTED_DATA, set_panic_hook};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 pub use wasm_bindgen_rayon::init_thread_pool;
 
 mod utils;
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
 
 #[wasm_bindgen(start)]
 fn main() -> Result<(), JsValue> {
@@ -92,12 +90,16 @@ impl CostModel {
 #[derive(Clone)]
 pub struct MidnightWasmParamsProvider {
     base_url: String,
+    cache: Arc<Mutex<HashMap<u8, midnight_transient_crypto::proofs::ParamsProver>>>,
 }
 
 #[wasm_bindgen]
 impl MidnightWasmParamsProvider {
     pub fn new(base_url: String) -> Self {
-        Self { base_url }
+        Self {
+            base_url,
+            cache: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 }
 
@@ -106,6 +108,10 @@ impl midnight_transient_crypto::proofs::ParamsProverProvider for MidnightWasmPar
         &self,
         k: u8,
     ) -> std::io::Result<midnight_transient_crypto::proofs::ParamsProver> {
+        if let Some(cached) = self.cache.lock().unwrap().get(&k).cloned() {
+            return Ok(cached);
+        }
+
         let data = EXPECTED_DATA[k as usize - 10];
 
         let mut url = self.base_url.clone();
@@ -155,20 +161,25 @@ impl midnight_transient_crypto::proofs::ParamsProverProvider for MidnightWasmPar
                 ),
             ))
         } else {
-            midnight_transient_crypto::proofs::ParamsProver::read(Cursor::new(raw)).map_err(|_e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Can't deserialize prover params".to_string(),
-                )
-            })
+            let params = midnight_transient_crypto::proofs::ParamsProver::read(Cursor::new(raw))
+                .map_err(|_e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Can't deserialize prover params".to_string(),
+                    )
+                })?;
+            self.cache.lock().unwrap().insert(k, params.clone());
+            Ok(params)
         }
     }
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct WasmResolver {
     base_url: String,
     client: reqwest::Client,
+    cache: Arc<Mutex<HashMap<String, ProvingKeyMaterial>>>,
 }
 
 #[wasm_bindgen]
@@ -177,6 +188,7 @@ impl WasmResolver {
         Self {
             base_url,
             client: reqwest::Client::new(),
+            cache: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -188,6 +200,10 @@ impl midnight_transient_crypto::proofs::Resolver for WasmResolver {
         } else {
             &key.0
         };
+
+        if let Some(cached) = self.cache.lock().unwrap().get(key_path).cloned() {
+            return Ok(Some(cached));
+        }
 
         let fetch_key_data = |suffix: String, key_type: String| async move {
             let url = format!("{}/{}/{}", self.base_url, key_path, suffix);
@@ -226,11 +242,17 @@ impl midnight_transient_crypto::proofs::Resolver for WasmResolver {
         let vk_raw = fetch_key_data("vk".to_string(), "verifier key".to_string()).await?;
         let ir_raw = fetch_key_data("ir".to_string(), "IR source".to_string()).await?;
 
-        Ok(Some(ProvingKeyMaterial {
+        let proving_key_material = ProvingKeyMaterial {
             prover_key: pk_raw,
             verifier_key: vk_raw,
             ir_source: ir_raw,
-        }))
+        };
+        self.cache
+            .lock()
+            .unwrap()
+            .insert(key_path.to_string(), proving_key_material.clone());
+
+        Ok(Some(proving_key_material))
     }
 }
 
