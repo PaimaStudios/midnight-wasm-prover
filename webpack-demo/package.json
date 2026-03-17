@@ -14,9 +14,9 @@
     "webpack-dev-server": "^5.0.4"
   },
   "dependencies": {
-    "@midnight-ntwrk/ledger-v6": "file:./vendor/midnight-ledger-v6-6.1.0-alpha.4.tgz",
-    "@midnight-ntwrk/onchain-runtime-v1": "file:./vendor/midnight-onchain-runtime-v1-1.0.0-alpha.4.tgz",
-    "@midnight-ntwrk/zkir-v2": "file:./vendor/midnight-zkir-v2-2.0.0-alpha.4.tgz",
+    "@midnight-ntwrk/ledger-v8": "file:./vendor/midnight-ledger-v8-8.0.2.tgz",
+    "@midnight-ntwrk/onchain-runtime-v3": "file:./vendor/midnight-onchain-runtime-v3-3.0.0.tgz",
+    "@midnight-ntwrk/zkir-v2": "file:./vendor/midnight-zkir-v2-2.1.0.tgz",
     "@paima/midnight-wasm-prover": "file:../pkg/"
   }
 }
