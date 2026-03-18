@@ -227,6 +227,11 @@ fn js_error_to_io(err: JsValue, kind: std::io::ErrorKind, context: &str) -> std:
     let message = err
         .as_string()
         .or_else(|| {
+            js_sys::Reflect::get(&err, &JsValue::from_str("message"))
+                .ok()
+                .and_then(|value| value.as_string())
+        })
+        .or_else(|| {
             js_sys::JSON::stringify(&err)
                 .ok()
                 .and_then(|s| s.as_string())
