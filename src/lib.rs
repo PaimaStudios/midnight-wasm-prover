@@ -129,6 +129,7 @@ impl midnight_transient_crypto::proofs::ParamsProverProvider for MidnightWasmPar
         }
 
         let data = EXPECTED_DATA[k as usize - 10];
+        let should_verify_hash = self.fetcher.is_none();
         let raw = self.fetch_params_bytes(k, data.0).await?;
 
         if raw.is_empty() {
@@ -138,28 +139,30 @@ impl midnight_transient_crypto::proofs::ParamsProverProvider for MidnightWasmPar
             ));
         }
 
-        let mut hasher = sha2::Sha256::new();
+        if should_verify_hash {
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(&raw);
+            let hash = <[u8; 32]>::from(hasher.finalize());
 
-        hasher.update(&raw);
-
-        let hash = <[u8; 32]>::from(hasher.finalize());
-
-        if hash != data.1 {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Hash mismatch for k: {k}. The params file may be outdated or corrupted."),
-            ))
-        } else {
-            let params = midnight_transient_crypto::proofs::ParamsProver::read(Cursor::new(raw))
-                .map_err(|_e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "Can't deserialize prover params".to_string(),
-                    )
-                })?;
-            self.cache.lock().unwrap().insert(k, params.clone());
-            Ok(params)
+            if hash != data.1 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Hash mismatch for k: {k}. The params file may be outdated or corrupted."
+                    ),
+                ));
+            }
         }
+
+        let params = midnight_transient_crypto::proofs::ParamsProver::read(Cursor::new(raw))
+            .map_err(|_e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Can't deserialize prover params".to_string(),
+                )
+            })?;
+        self.cache.lock().unwrap().insert(k, params.clone());
+        Ok(params)
     }
 }
 
