@@ -1,6 +1,6 @@
 [package]
 name = "midnight-wasm-prover"
-version = "0.1.0-alpha5"
+version = "0.1.0-alpha6"
 authors = ["Enzo Cioppettini <48031343+ecioppettini@users.noreply.github.com>"]
 edition = "2024"
 license = "Apache-2.0"
@@ -33,8 +33,6 @@ ledger-storage = { git = "https://github.com/midnightntwrk/midnight-ledger", pac
 rand = { version = "^0.8.4", features = ["getrandom"] }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
-url = "2.5.4"
-reqwest = "0.12.15"
 sha2 = "0.10.9"
 const-hex = "1.17.0"
 
