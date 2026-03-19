@@ -85,8 +85,26 @@ self.onmessage = async (event: MessageEvent<ProverMessage>) => {
   if (type === "params") {
     const { baseUrl } = event.data;
 
-    const resolver = WasmResolver.new(baseUrl);
-    const pp = MidnightWasmParamsProvider.new(baseUrl);
+    const buildUrl = (path: string) => new URL(path, baseUrl).toString();
+
+    const resolver = WasmResolver.newWithFetchers(
+      async (keyPath: string) => {
+        const response = await fetch(buildUrl(`${keyPath}/pk`));
+        return new Uint8Array(await response.arrayBuffer());
+      },
+      async (keyPath: string) => {
+        const response = await fetch(buildUrl(`${keyPath}/vk`));
+        return new Uint8Array(await response.arrayBuffer());
+      },
+      async (keyPath: string) => {
+        const response = await fetch(buildUrl(`${keyPath}/ir`));
+        return new Uint8Array(await response.arrayBuffer());
+      },
+    );
+    const pp = MidnightWasmParamsProvider.newWithFetcher(async (k: number) => {
+      const response = await fetch(buildUrl(`bls_midnight_2p${k}`));
+      return new Uint8Array(await response.arrayBuffer());
+    });
 
     prover = WasmProver.new(resolver, pp);
 
