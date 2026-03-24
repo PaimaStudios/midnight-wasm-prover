@@ -21,15 +21,15 @@ futures = "0.3.31"
 anyhow = "1.0"
 js-sys = "0.3"
 
-midnight-ledger = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-ledger", tag = "ledger-8.0.2" }
-midnight-base-crypto = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-base-crypto", tag = "ledger-8.0.2" }
-midnight-onchain-runtime = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-onchain-runtime", tag = "ledger-8.0.2" }
-midnight-onchain-state = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-onchain-state", tag = "ledger-8.0.2" }
-coin-structure = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-coin-structure", tag = "ledger-8.0.2" }
-midnight-transient-crypto = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-transient-crypto", tag = "ledger-8.0.2" }
-zkir = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-zkir", tag = "ledger-8.0.2" }
-midnight-serialize = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-serialize", tag = "ledger-8.0.2" }
-ledger-storage = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-storage", tag = "ledger-8.0.2", default-features = false }
+midnight-ledger = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-ledger", tag = "ledger-8.0.3" }
+midnight-base-crypto = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-base-crypto", tag = "ledger-8.0.3" }
+midnight-onchain-runtime = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-onchain-runtime", tag = "ledger-8.0.3" }
+midnight-onchain-state = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-onchain-state", tag = "ledger-8.0.3" }
+coin-structure = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-coin-structure", tag = "ledger-8.0.3" }
+midnight-transient-crypto = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-transient-crypto", tag = "ledger-8.0.3" }
+zkir = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-zkir", tag = "ledger-8.0.3" }
+midnight-serialize = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-serialize", tag = "ledger-8.0.3" }
+ledger-storage = { git = "https://github.com/midnightntwrk/midnight-ledger", package = "midnight-storage", tag = "ledger-8.0.3", default-features = false }
 rand = { version = "^0.8.4", features = ["getrandom"] }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
